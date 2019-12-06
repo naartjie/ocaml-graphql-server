@@ -170,6 +170,11 @@ struct
       | Some s -> List.mem "text/html" (String.split_on_char ',' s)
     in
     match (req.meth, path_parts, accept_html) with
+    | `OPTIONS, [ "graphql" ], false ->
+        Io.return
+          (`Response
+            ( Cohttp.Response.make ~status:Cohttp.Response.(`No_content) (),
+              Body.of_string "" ))
     | `GET, [ "graphql" ], true -> static_file_response "index.html"
     | `GET, [ "graphql" ], false ->
         if
