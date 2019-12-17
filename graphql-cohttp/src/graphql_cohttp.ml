@@ -125,9 +125,18 @@ struct
   type 'conn callback =
     'conn -> Cohttp.Request.t -> Body.t -> response_action Io.t
 
+  let cors_headers =
+    Cohttp.Header.(
+      let h = init () in
+      let h = add h "Access-Control-Allow-Origin" "*" in
+      let h = add h "Access-Control-Allow-Headers" "*" in
+      h)
+
   let respond_string ~status ~body () =
     Io.return
-      (`Response (Cohttp.Response.make ~status (), Body.of_string body))
+      (`Response
+        ( Cohttp.Response.make ~status ~headers:cors_headers (),
+          Body.of_string body ))
 
   let static_file_response path =
     match Assets.read path with
@@ -173,22 +182,25 @@ struct
     | `OPTIONS, [ "graphql" ], false ->
         Io.return
           (`Response
-            ( Cohttp.Response.make ~status:Cohttp.Response.(`No_content) (),
+            ( Cohttp.Response.make
+                ~status:Cohttp.Response.(`No_content)
+                ~headers:cors_headers (),
               Body.of_string "" ))
-    | `GET, [ "graphql" ], true -> static_file_response "index.html"
     | `GET, [ "graphql" ], false ->
         if
           Cohttp.Header.get headers "Connection" = Some "Upgrade"
           && Cohttp.Header.get headers "Upgrade" = Some "websocket"
         then
           let handle_conn =
-            Websocket_transport.handle
-              (execute_query (make_context req) schema)
+            Websocket_transport.handle (execute_query (make_context req) schema)
           in
           Io.return (Ws.upgrade_connection req handle_conn)
         else execute_request schema (make_context req) req body
-    | `GET, [ "graphql"; path ], _ -> static_file_response path
     | `POST, [ "graphql" ], _ ->
         execute_request schema (make_context req) req body
+    | `GET, [], true -> static_file_response "index.html"
+    | `GET, [ "graphql" ], true -> static_file_response "index.html"
+    | `GET, [ "graphql"; path ], _ -> static_file_response path
+    | `GET, [ path ], _ -> static_file_response path
     | _ -> respond_string ~status:`Not_found ~body:"" ()
 end
