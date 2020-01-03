@@ -117,7 +117,15 @@ let () =
           func arg
     | exn -> printf "Unhandled exception: %s\n%!" (Printexc.to_string exn)
   in
-  let callback = Graphql_cohttp_lwt.make_callback (fun _req -> ()) schema in
+
+  let callback =
+    Graphql_cohttp_lwt.make_callback
+      (fun req ->
+        match Cohttp.(Header.get (Request.headers req) "Authorization") with
+        | Some "Bearer XYZ" -> Some "user=XYZ"
+        | _ -> None)
+      schema
+  in
   let server = Cohttp_lwt_unix.Server.make_response_action ~callback () in
   let port = 8080 in
   let mode = `TCP (`Port port) in
