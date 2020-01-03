@@ -181,11 +181,9 @@ struct
     match (req.meth, path_parts, accept_html) with
     | `OPTIONS, [ "graphql" ], false ->
         Io.return
-          (`Response
-            ( Cohttp.Response.make
-                ~status:Cohttp.Response.(`No_content)
-                ~headers:cors_headers (),
-              Body.of_string "" ))
+        @@ `Response
+             ( Cohttp.Response.make ~status:`No_content ~headers:cors_headers (),
+               Body.of_string "" )
     | `GET, [ "graphql" ], false ->
         if
           Cohttp.Header.get headers "Connection" = Some "Upgrade"
