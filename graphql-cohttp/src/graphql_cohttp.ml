@@ -26,7 +26,7 @@ module type S = sig
     'ctx schema -> 'ctx -> Cohttp.Request.t -> body -> response_action IO.t
 
   val make_callback :
-    (Cohttp.Request.t -> 'ctx) -> 'ctx schema -> 'conn callback
+    (Cohttp.Request.t -> 'ctx option) -> 'ctx schema -> 'conn callback
 end
 
 module Option = struct
@@ -132,6 +132,11 @@ struct
       let h = add h "Access-Control-Allow-Headers" "*" in
       h)
 
+  let not_authorized =
+    `Response
+      ( Cohttp.Response.make ~status:`Unauthorized ~headers:cors_headers (),
+        Body.of_string "" )
+
   let respond_string ~status ~body () =
     Io.return
       (`Response
@@ -168,7 +173,8 @@ struct
             respond_string ~status:`Bad_request ~body () )
 
   let make_callback :
-      (Cohttp.Request.t -> 'ctx) -> 'ctx Schema.schema -> 'conn callback =
+      (Cohttp.Request.t -> 'ctx option) -> 'ctx Schema.schema -> 'conn callback
+      =
    fun make_context schema _conn (req : Cohttp.Request.t) body ->
     let req_path = Cohttp.Request.uri req |> Uri.path in
     let path_parts = Astring.String.cuts ~empty:false ~sep:"/" req_path in
@@ -184,18 +190,24 @@ struct
         @@ `Response
              ( Cohttp.Response.make ~status:`No_content ~headers:cors_headers (),
                Body.of_string "" )
-    | `GET, [ "graphql" ], false ->
-        if
-          Cohttp.Header.get headers "Connection" = Some "Upgrade"
-          && Cohttp.Header.get headers "Upgrade" = Some "websocket"
-        then
-          let handle_conn =
-            Websocket_transport.handle (execute_query (make_context req) schema)
-          in
-          Io.return (Ws.upgrade_connection req handle_conn)
-        else execute_request schema (make_context req) req body
-    | `POST, [ "graphql" ], _ ->
-        execute_request schema (make_context req) req body
+    | `GET, [ "graphql" ], false -> (
+        let ctx = make_context req in
+        match ctx with
+        | None -> Io.return not_authorized
+        | Some ctx ->
+            if
+              Cohttp.Header.get headers "Connection" = Some "Upgrade"
+              && Cohttp.Header.get headers "Upgrade" = Some "websocket"
+            then
+              let handle_conn =
+                Websocket_transport.handle (execute_query ctx schema)
+              in
+              Io.return (Ws.upgrade_connection req handle_conn)
+            else execute_request schema ctx req body )
+    | `POST, [ "graphql" ], _ -> (
+        match make_context req with
+        | None -> Io.return not_authorized
+        | Some ctx -> execute_request schema ctx req body )
     | `GET, [], true -> static_file_response "index.html"
     | `GET, [ "graphql" ], true -> static_file_response "index.html"
     | `GET, [ "graphql"; path ], _ -> static_file_response path

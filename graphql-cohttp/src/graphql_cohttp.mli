@@ -26,7 +26,7 @@ module type S = sig
     'ctx schema -> 'ctx -> Cohttp.Request.t -> body -> response_action IO.t
 
   val make_callback :
-    (Cohttp.Request.t -> 'ctx) -> 'ctx schema -> 'conn callback
+    (Cohttp.Request.t -> 'ctx option) -> 'ctx schema -> 'conn callback
 end
 
 module Make
