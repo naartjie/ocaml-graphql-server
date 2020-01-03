@@ -24,10 +24,7 @@ let user =
   Schema.(
     obj "user" ~fields:(fun user ->
         [
-          field "id"
-            ~args:Arg.[]
-            ~typ:(non_null int)
-            ~resolve:(fun _ p -> p.id);
+          field "id" ~args:Arg.[] ~typ:(non_null int) ~resolve:(fun _ p -> p.id);
           field "name"
             ~args:Arg.[]
             ~typ:(non_null string)
