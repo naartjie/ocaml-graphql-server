@@ -208,9 +208,7 @@ struct
         match make_context req with
         | None -> Io.return not_authorized
         | Some ctx -> execute_request schema ctx req body )
-    | `GET, [], true -> static_file_response "index.html"
     | `GET, [ "graphql" ], true -> static_file_response "index.html"
     | `GET, [ "graphql"; path ], _ -> static_file_response path
-    | `GET, [ path ], _ -> static_file_response path
     | _ -> respond_string ~status:`Not_found ~body:"" ()
 end
